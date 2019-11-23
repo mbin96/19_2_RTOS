@@ -48,6 +48,7 @@
 */
 
 #pragma warning(disable:4996)
+#define STKSIZE 10
 
 
 /*
@@ -60,7 +61,9 @@ static  OS_STK  StartupTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 static  OS_STK  senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 static  OS_STK  reciverTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 
-//static OS_STK [];
+static int stack[STKSIZE];
+static int head;
+static int tail;
 
 /*
 *********************************************************************************************************
@@ -85,6 +88,8 @@ static  void  sender(void* p_arg);
 * Notes       : none
 *********************************************************************************************************
 */
+
+
 
 int  main (void)
 {
@@ -111,11 +116,6 @@ int  main (void)
                      0u,
                     (OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR));
 
-    OSTaskCreate(sender,                               /* Create the startup task                              */
-        0,
-        &senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u],
-        9u
-        );
 
 
 #if OS_TASK_NAME_EN > 0u
@@ -151,14 +151,24 @@ static  void  sender(void* p_arg) {
     int input;
     while (DEF_TRUE) {
         OSTimeDlyHMSM(0u, 0u, 2u, 0u);
-        printf("inputTask >");
+        printf("sender@input >");
         scanf("%d", &input);
-        printf("input: %d\n\r", input);
+        stack[tail] = input;
+        tail++;
+        tail = tail % STKSIZE;
+        printf("sender@input: %d\n\r", input);
     }
 }
 
 static  void  reciver(void* p_arg) {
-
+    int output;
+    while (DEF_TRUE) {
+        OSTimeDlyHMSM(0u, 0u, 2u, 0u);
+        output = stack[head];
+        head++;
+        head = head % STKSIZE;
+        printf("reciver@output: %d\n\r", output);
+    }
 }
 
 static  void  StartupTask (void *p_arg)
@@ -176,6 +186,17 @@ static  void  StartupTask (void *p_arg)
 #endif
     
     APP_TRACE_DBG(("uCOS-III is Running...\n\r"));
+
+    OSTaskCreate(sender,                               /* Create the startup task                              */
+        0,
+        &senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u],
+        9u
+    );
+    OSTaskCreate(reciver,                               /* Create the startup task                              */
+        0,
+        &reciverTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u],
+        8u
+    );
 
     while (DEF_TRUE) {                                          /* Task body, always written as an infinite loop.       */
         OSTimeDlyHMSM(0u, 0u, 1u, 0u);
