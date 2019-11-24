@@ -47,6 +47,8 @@
 *********************************************************************************************************
 */
 
+#pragma warning(disable:4996)
+
 
 /*
 *********************************************************************************************************
@@ -55,7 +57,10 @@
 */
 
 static  OS_STK  StartupTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
+static  OS_STK  senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
+static  OS_STK  reciverTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 
+//static OS_STK [];
 
 /*
 *********************************************************************************************************
@@ -64,7 +69,7 @@ static  OS_STK  StartupTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 */
 
 static  void  StartupTask (void  *p_arg);
-
+static  void  sender(void* p_arg);
 
 /*
 *********************************************************************************************************
@@ -106,6 +111,13 @@ int  main (void)
                      0u,
                     (OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR));
 
+    OSTaskCreate(sender,                               /* Create the startup task                              */
+        0,
+        &senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u],
+        9u
+        );
+
+
 #if OS_TASK_NAME_EN > 0u
     OSTaskNameSet(         APP_CFG_STARTUP_TASK_PRIO,
                   (INT8U *)"Startup Task",
@@ -134,6 +146,20 @@ int  main (void)
 *                  used.  The compiler should not generate any code for this statement.
 *********************************************************************************************************
 */
+
+static  void  sender(void* p_arg) {
+    int input;
+    while (DEF_TRUE) {
+        OSTimeDlyHMSM(0u, 0u, 2u, 0u);
+        printf("inputTask >");
+        scanf("%d", &input);
+        printf("input: %d\n\r", input);
+    }
+}
+
+static  void  reciver(void* p_arg) {
+
+}
 
 static  void  StartupTask (void *p_arg)
 {
