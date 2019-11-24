@@ -48,7 +48,7 @@
 */
 
 #pragma warning(disable:4996)
-#define STKSIZE 10
+#define N 10
 
 
 /*
@@ -61,9 +61,14 @@ static  OS_STK  StartupTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 static  OS_STK  senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 static  OS_STK  reciverTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 
-static int stack[STKSIZE];
-static int head;
-static int tail;
+static int stack[N];
+static int head = 0;
+static int tail = 0;
+static INT16U sem = 0;
+OS_EVENT* m;
+OS_EVENT* empty;
+OS_EVENT* full;
+
 
 /*
 *********************************************************************************************************
@@ -147,26 +152,55 @@ int  main (void)
 *********************************************************************************************************
 */
 
+static int pop() {
+    int output = stack[head];
+    head++;
+    //for circular buffer
+    head = head % N;
+    return output;
+}
+
+static void push(int input) {
+    stack[tail] = input;
+    tail++;
+    //for circular buffer
+    tail = tail % N;
+}
+
 static  void  sender(void* p_arg) {
     int input;
+    INT8U err;
     while (DEF_TRUE) {
-        OSTimeDlyHMSM(0u, 0u, 2u, 0u);
+        //scanf input for stack push
         printf("sender@input >");
         scanf("%d", &input);
-        stack[tail] = input;
-        tail++;
-        tail = tail % STKSIZE;
+        //sem and mutex wait
+        OSSemPend(empty, 0, &err);
+        OSMutexPend(m, 0, &err);
+        //stack push
+        push(input);
+        //sem and mutex signal
+        OSMutexPost(m);
+        OSSemPost(full);
         printf("sender@input: %d\n\r", input);
     }
 }
 
 static  void  reciver(void* p_arg) {
     int output;
+    INT8U err;
     while (DEF_TRUE) {
+        //delay 2sec
         OSTimeDlyHMSM(0u, 0u, 2u, 0u);
-        output = stack[head];
-        head++;
-        head = head % STKSIZE;
+        //semapore and mutex wait
+        OSSemPend(full, 0, &err);
+        OSMutexPend(m, 0, &err);
+        //stack pop
+        output = pop();
+        //sem and mutex signal
+        OSMutexPost(m);
+        OSSemPost(empty);
+        
         printf("reciver@output: %d\n\r", output);
     }
 }
@@ -186,17 +220,14 @@ static  void  StartupTask (void *p_arg)
 #endif
     
     APP_TRACE_DBG(("uCOS-III is Running...\n\r"));
+    INT8U os_err;
+    m = OSMutexCreate(7u, &os_err);
+    empty = OSSemCreate(N);
+    full = OSSemCreate(0);
 
-    OSTaskCreate(sender,                               /* Create the startup task                              */
-        0,
-        &senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u],
-        9u
-    );
-    OSTaskCreate(reciver,                               /* Create the startup task                              */
-        0,
-        &reciverTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u],
-        8u
-    );
+    //create sender and reciver task
+    OSTaskCreate(sender, 0, &senderTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u], 9u);
+    OSTaskCreate(reciver, 0, &reciverTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1u], 8u);
 
     while (DEF_TRUE) {                                          /* Task body, always written as an infinite loop.       */
         OSTimeDlyHMSM(0u, 0u, 1u, 0u);
